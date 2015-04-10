@@ -13,7 +13,7 @@ class Pushbullet():
 
 		self.pt1 = ['curl','--header','Authorization: Bearer '+self.user_token,'-X']
 
-		self.mobile_id = 'YOUR MOBILES ID'
+		self.mobile_id = 'MOBILE DEVICES IDEN'
 		self.reply_to_number = "Phone Number"
 		self.reply_to_name = "Person"
 
