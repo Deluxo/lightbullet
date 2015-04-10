@@ -1,98 +1,138 @@
 #!/usr/bin/env python
+
+"""
+TO-DO:
+- asking to enter user_token on first run
+- settings file
+- selecting to which device to push
+- selecting prefered mobile device
+- clean the source, modulize properly±
+"""
+
 from gi.repository import Gtk
+from gi.repository import Gdk
 from gi.repository import GLib
 from gi.repository import GObject
-from gi.repository import AppIndicator3 as appindicator
-from gi.repository import Notify
-
+from gi.repository import AppIndicator3
 from pushbulletapi import Pushbullet
 from interface import MainMenu, MyWindow
+from utils import get_icon, osd, pwd, assign_from_json
+import signal, time, threading
 
-import signal, time, threading, base64, os
-
-APPINDICATOR_ID = 'myappindicator'
-DIR = os.path.dirname(os.path.realpath(__file__))+'/'
-ICON = DIR+'static/pushbullet-indicator-light.svg'
+APPINDICATOR_ID = 'lightbullet'
+ICON = pwd()+'static/pushbullet-indicator-light.svg'
 signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+bullet = Pushbullet()
+
+menu = MainMenu()
+menu.delete_all_pushes_item.connect("activate", bullet.push_delete_all)
+
+indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, ICON, AppIndicator3.IndicatorCategory.SYSTEM_SERVICES)
+indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+indicator.set_attention_icon(pwd()+"static/pushbullet-indicator-red.svg")
+indicator.set_menu(menu.main_menu)
+
+def on_esc(widget, ev, window, data=None):
+	if ev.keyval == Gdk.KEY_Escape: #If Escape pressed, reset text
+		window.destroy()
+
+def on_enter(widget, ev, window, bullet, data=None):
+		if ev.keyval == Gdk.KEY_Escape: #If Escape pressed, reset text
+			bullet.push_sms(window.title_entry.get_text(), window.body_entry.get_text())
 
 def new_note(e):
 	def on_note_click(e):
 		bullet.push_note(win.title_entry.get_text(), win.body_entry.get_text())
 		win.destroy()
-	win = MyWindow()
-	win.button.connect('clicked', on_note_click)
-	win.show_all()
 
-def new_link(e):
+	win = MyWindow()
+	win.set_title("Push Note")
+	win.button.connect('clicked', on_note_click)
+	win.connect("key-release-event", on_esc, win)
+	win.show_all()
+	win.link_entry.hide()
+	win.resize(1, 1)
+menu.push_note_item.connect('activate', new_note)
+
+def new_link(e, link='http://'):
 	def on_link_click(e):
 		bullet.push_link(win.title_entry.get_text(), win.body_entry.get_text(), win.link_entry.get_text())
 		win.destroy()
+
 	win = MyWindow()
+	win.set_title("Push Link")
+	win.link_entry.set_text(link)
 	win.button.connect('clicked', on_link_click)
+	win.connect("key-release-event", on_esc, win, bullet)
 	win.show_all()
-
-def osd(title, body, icon=ICON):
-	if icon:
-		print 'icon should be in: '+icon
-	Notify.Notification.new(title, body, icon).show()
-
-def get_icon(base64_image):
-	icondata = base64.b64decode(base64_image)
-	iconfile = open(DIR+"static/icon.ico","wb")
-	iconfile.write(icondata)
-	iconfile.close()
-	return DIR+'static/icon.ico'
-
-bullet = Pushbullet('YOUR PUSHBULLET ID')
-menu = MainMenu()
-menu.push_note_item.connect('activate', new_note)
 menu.push_link_item.connect('activate', new_link)
-menu.delete_all_pushes_item.connect("activate", bullet.push_delete_all)
 
-def multithreaded_update():
+def new_sms(e):
+	def on_sms_click(e):
+		bullet.push_sms(win.title_entry.get_text(), win.body_entry.get_text())
+		win.destroy()
+
+	win = MyWindow()
+	win.set_title(bullet.reply_to_name)
+	win.title_entry.set_text(bullet.reply_to_number)
+	win.body_entry.set_text("Message")
+	win.button.connect('clicked', on_sms_click)
+	win.connect("key-release-event", on_esc, win)
+	win.connect("key-release-event", on_esc, win)
+	win.show_all()
+	indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+	win.link_entry.hide()
+	win.resize(1, 1)
+	if win.title_entry.get_text() != "Phone Number":
+		win.body_entry.grab_focus()
+menu.push_sms_item.connect('activate', new_sms)
+
+def multithreaded_update(indicator):
 	# initial data download
 	pushes_list = bullet.get_pushes()
 	GLib.idle_add(menu.update_list,pushes_list)
-	# preparing socket
-	ws = bullet.socket_connect()
 	while True:
 		try:
-			callback = bullet.socket_check(ws)
+			p = bullet.socket_check(ws)
 		except:
 			ws = bullet.socket_connect()
-		if callback['type'] == 'tickle':
-			if callback['subtype'] == 'push':
+			p = bullet.socket_check(ws)
+			# osd(APPINDICATOR_ID, APPINDICATOR_ID, "Has started", ICON)
+		print p
+		if p['type'] == 'tickle':
+			if p['subtype'] == 'push':
 				pushes_list = bullet.get_pushes()
 				GLib.idle_add(menu.update_list,pushes_list)
+
 			if pushes_list[0]['active']:
-				osd(pushes_list[0]['title'], pushes_list[0]['body'])
-		elif callback['type'] == 'push':
-			print callback
+				osd(APPINDICATOR_ID, pushes_list[0]['title'], pushes_list[0]['body'])
+
+		elif p['type'] == 'push':
+			title = assign_from_json(p['push'],('title', 'application_name'), APPINDICATOR_ID)
+			body = assign_from_json(p['push'], ('body', 'type'), "Unresolved")
+
 			try:
-				title = callback['push']['title']
+				icon = p['push']['icon']
+				osd(APPINDICATOR_ID, title, body, get_icon(icon, pwd()+'static/'))
 			except:
-				title = callback['push']['application_name']
+				pass
+
 			try:
-				body = callback['push']['body']
+				bullet.reply_to_number = p['push']['conversation_iden']
+				bullet.reply_to_name = p['push']['title']
+ 				indicator.set_status(AppIndicator3.IndicatorStatus.ATTENTION)
 			except:
-				body = callback['push']['type']
-			icon = callback['push']['icon']
-			osd(title, body, get_icon(icon))
-			GLib.idle_add(menu.append_item, callback['push'])
+				pass
+
+			GLib.idle_add(menu.append_item, p['push'])
+
 		time.sleep(4)
 
 def main():
-	indicator = appindicator.Indicator.new(APPINDICATOR_ID, ICON,
-		appindicator.IndicatorCategory.SYSTEM_SERVICES)
-	indicator.set_status(appindicator.IndicatorStatus.ACTIVE)
-	indicator.set_menu(menu.main_menu)
-
-	Notify.init(APPINDICATOR_ID)
-
-	thread = threading.Thread(target=multithreaded_update)
+	thread = threading.Thread(target=multithreaded_update, args=(indicator,))
 	thread.daemon = True
 	thread.start()
-
 	Gtk.main()
 
 if __name__ == "__main__":

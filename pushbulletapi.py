@@ -3,13 +3,19 @@ import json
 from websocket import create_connection
 
 class Pushbullet():
-	def __init__(self, user_id):
-		self.user_id = user_id
-		self.pt1 = ['curl','--header','Authorization: Bearer '+self.user_id,'-X']
+	def __init__(self):
+		self.user_token = 'YOUR USER TOKEN'
+		self.user_token_metadata = json.loads(subprocess.check_output(['curl','--header','Authorization: Bearer '+self.user_token,'https://api.pushbullet.com/v2/users/me']))
+		self.user_token_name = self.user_token_metadata['name']
+		self.user_token_email = self.user_token_metadata['email']
 
-		self.user_id_metadata = json.loads(subprocess.check_output(['curl','--header','Authorization: Bearer '+self.user_id,'https://api.pushbullet.com/v2/users/me']))
-		self.user_id_name = self.user_id_metadata['name']
-		self.user_id_email = self.user_id_metadata['email']
+		self.user_id = self.user_token_metadata['iden']
+
+		self.pt1 = ['curl','--header','Authorization: Bearer '+self.user_token,'-X']
+
+		self.mobile_id = 'YOUR MOBILES ID'
+		self.reply_to_number = "Phone Number"
+		self.reply_to_name = "Person"
 
 	def push_note(self, title = 'Unspecified', body = 'Unspecified'):
 		self.pt2 = [
@@ -45,14 +51,23 @@ class Pushbullet():
 		subprocess.call(self.pt1+self.pt2)
 
 	def get_pushes(self, modified_after=0):
-
 		self.pt2 = [
 			'GET',
 			'https://api.pushbullet.com/v2/pushes?modified_after='+str(modified_after)]
-		print self.pt2
 		output = subprocess.check_output(self.pt1+self.pt2)
 		output = json.loads(output)
 		return output['pushes']
+
+	def push_sms(self, mobile_number, message):
+		self.pt2 = [
+			'POST',
+			'https://api.pushbullet.com/v2/ephemerals',
+			'--header',
+			'Content-Type: application/json',
+			'--data-binary',
+			'{"type": "push", "push": {"type": "messaging_extension_reply", "package_name": "com.pushbullet.android", "source_user_iden": "'+self.user_id+'", "target_device_iden": "'+self.mobile_id+'", "conversation_iden": "'+mobile_number+'", "message": "'+message+'"}}']
+
+		subprocess.call(self.pt1+self.pt2)
 
 	def push_delete_all(self,e):
 		self.pt2 = [
@@ -62,7 +77,7 @@ class Pushbullet():
 		subprocess.call(self.pt1+self.pt2)
 
 	def socket_connect(self):
-		return create_connection('wss://stream.pushbullet.com/websocket/'+self.user_id)
+		return create_connection('wss://stream.pushbullet.com/websocket/'+self.user_token)
 
 	def socket_check(self, ws):
 		return json.loads(ws.recv())

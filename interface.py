@@ -1,15 +1,14 @@
 from gi.repository import Gtk
 
 class MyWindow(Gtk.Window):
-
-    def __init__(self):
-        Gtk.Window.__init__(self, title="Push")
+    def __init__(self, title='Title'):
+        Gtk.Window.__init__(self)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(self.vbox)
 
         self.title_entry = Gtk.Entry()
-        self.title_entry.set_text("Title")
+        self.title_entry.set_text(title)
         self.vbox.pack_start(self.title_entry, True, True, 0)
 
         self.body_entry = Gtk.Entry()
@@ -38,13 +37,22 @@ class MainMenu():
 		self.push_file_item = Gtk.MenuItem('Push File')
 		self.main_menu.append(self.push_file_item)
 
+		self.push_sms_item = Gtk.MenuItem('Push SMS')
+		self.main_menu.append(self.push_sms_item)
+
+		self.main_menu.append(Gtk.SeparatorMenuItem())
+
 		self.delete_all_pushes_item = Gtk.MenuItem('Delete all pushes')
 		self.main_menu.append(self.delete_all_pushes_item)
+
+		self.main_menu.append(Gtk.SeparatorMenuItem())
 
 		self.history_menu_item = Gtk.MenuItem('History')
 		self.history_menu_item.set_submenu(self.history_menu)
 		# history menu
 		self.main_menu.append(self.history_menu_item)
+
+		self.main_menu.append(Gtk.SeparatorMenuItem())
 
 		self.quit_menu_item = Gtk.MenuItem("Quit")
 		self.quit_menu_item.connect("activate", quit)
@@ -65,19 +73,12 @@ class MainMenu():
 	def append_item(self, item):
 		from utils import epoch_to_readable, open_link
 		import time
-		try:
-			self.title = item['title']
-		except:
-			self.title = item['application_name']
-		try:
-			self.meta = epoch_to_readable(item['modified'])
-		except:
-			self.meta = epoch_to_readable(time.time())
+		self.title = assign_from_json(item, ('title', 'application_name'), 'Push')
+		self.meta = assign_from_json(item, ('modified', epoch_to_readable(time.time())), 'Push')
 		self.history_menu_item = Gtk.MenuItem(self.title + ' (' + self.meta + ')')
 		self.history_menu_item.connect('activate',open_link, 'https://www.pushbullet.com/')
 		self.history_menu.prepend(self.history_menu_item)
 		self.history_menu.show_all()
-
 
 	def update_list(self, list):
 
