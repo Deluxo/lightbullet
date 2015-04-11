@@ -13,5 +13,5 @@ Minimalistic and lightweight pushbullet indicator (ubuntu based, distros)
 ### running
 
 - get your access token from here: https://www.pushbullet.com/account
-- in file ind.py, line 64, paste your access token in Pushbullet( ->here<- )
-- run ind.py
+- in file settings.ini, put your User Token there.
+- if you want to use sms functionality as well, you will have to get your mobile devices iden as well and put it there.
