@@ -3,8 +3,8 @@ import json
 from websocket import create_connection
 
 class Pushbullet():
-	def __init__(self):
-		self.user_token = 'YOUR USER TOKEN'
+	def __init__(self, user_token, mobile_id):
+		self.user_token = user_token
 		self.user_token_metadata = json.loads(subprocess.check_output(['curl','--header','Authorization: Bearer '+self.user_token,'https://api.pushbullet.com/v2/users/me']))
 		self.user_token_name = self.user_token_metadata['name']
 		self.user_token_email = self.user_token_metadata['email']
@@ -13,9 +13,11 @@ class Pushbullet():
 
 		self.pt1 = ['curl','--header','Authorization: Bearer '+self.user_token,'-X']
 
-		self.mobile_id = 'MOBILE DEVICES IDEN'
+		self.mobile_id = mobile_id
 		self.reply_to_number = "Phone Number"
 		self.reply_to_name = "Person"
+		self.reply_to_message = ""
+
 
 	def push_note(self, title = 'Unspecified', body = 'Unspecified'):
 		self.pt2 = [

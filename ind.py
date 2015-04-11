@@ -3,19 +3,19 @@
 """
 TO-DO:
 - asking to enter user_token on first run
-- settings file
 - selecting to which device to push
 - selecting prefered mobile device
-- clean the source, modulize properly±
+- clean the source, modulize properly
 """
 
 from gi.repository import Gtk
-from gi.repository import Gdk
 from gi.repository import GLib
 from gi.repository import GObject
 from gi.repository import AppIndicator3
 from pushbulletapi import Pushbullet
 from interface import MainMenu, MyWindow
+from configobj import ConfigObj
+
 from utils import get_icon, osd, pwd, assign_from_json
 import signal, time, threading
 
@@ -23,7 +23,7 @@ APPINDICATOR_ID = 'lightbullet'
 ICON = pwd()+'static/pushbullet-indicator-light.svg'
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-bullet = Pushbullet()
+bullet = Pushbullet(ConfigObj('settings.ini')['user']['user_token'], ConfigObj('settings.ini')['user']['mobile_iden'])
 
 menu = MainMenu()
 menu.delete_all_pushes_item.connect("activate", bullet.push_delete_all)
@@ -34,12 +34,13 @@ indicator.set_attention_icon(pwd()+"static/pushbullet-indicator-red.svg")
 indicator.set_menu(menu.main_menu)
 
 def on_esc(widget, ev, window, data=None):
-	if ev.keyval == Gdk.KEY_Escape: #If Escape pressed, reset text
+	if ev.keyval == 65307:
 		window.destroy()
 
 def on_enter(widget, ev, window, bullet, data=None):
-		if ev.keyval == Gdk.KEY_Escape: #If Escape pressed, reset text
-			bullet.push_sms(window.title_entry.get_text(), window.body_entry.get_text())
+	if ev.keyval == 65293 and window.body_entry.is_focus() and window.title_entry.get_text() != "Phone Number":
+		bullet.push_sms(window.title_entry.get_text(), window.body_entry.get_text())
+		window.destroy()
 
 def new_note(e):
 	def on_note_click(e):
@@ -64,7 +65,7 @@ def new_link(e, link='http://'):
 	win.set_title("Push Link")
 	win.link_entry.set_text(link)
 	win.button.connect('clicked', on_link_click)
-	win.connect("key-release-event", on_esc, win, bullet)
+	win.connect("key-release-event", on_esc, win)
 	win.show_all()
 menu.push_link_item.connect('activate', new_link)
 
@@ -77,12 +78,15 @@ def new_sms(e):
 	win.set_title(bullet.reply_to_name)
 	win.title_entry.set_text(bullet.reply_to_number)
 	win.body_entry.set_text("Message")
+	win.message.set_text(bullet.reply_to_message)
 	win.button.connect('clicked', on_sms_click)
 	win.connect("key-release-event", on_esc, win)
-	win.connect("key-release-event", on_esc, win)
+	win.connect("key-release-event", on_enter, win, bullet)
 	win.show_all()
 	indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 	win.link_entry.hide()
+	if win.message.get_text() == '':
+		win.message.hide()
 	win.resize(1, 1)
 	if win.title_entry.get_text() != "Phone Number":
 		win.body_entry.grab_focus()
@@ -121,6 +125,8 @@ def multithreaded_update(indicator):
 			try:
 				bullet.reply_to_number = p['push']['conversation_iden']
 				bullet.reply_to_name = p['push']['title']
+				bullet.reply_to_message = p['push']['body']
+
  				indicator.set_status(AppIndicator3.IndicatorStatus.ATTENTION)
 			except:
 				pass

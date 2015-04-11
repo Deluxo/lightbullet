@@ -22,6 +22,9 @@ class MyWindow(Gtk.Window):
         self.button = Gtk.Button(label="Send")
         self.vbox.pack_start(self.button, True, True, 0)
 
+        self.message = Gtk.Label()
+        self.vbox.pack_start(self.message, True, True, 0)
+
 class MainMenu():
 	def __init__(self):
 		# main menu
@@ -71,10 +74,11 @@ class MainMenu():
 				self.history_menu.show_all()
 
 	def append_item(self, item):
-		from utils import epoch_to_readable, open_link
+		from utils import epoch_to_readable, open_link, assign_from_json
 		import time
 		self.title = assign_from_json(item, ('title', 'application_name'), 'Push')
 		self.meta = assign_from_json(item, ('modified', epoch_to_readable(time.time())), 'Push')
+		print self.meta
 		self.history_menu_item = Gtk.MenuItem(self.title + ' (' + self.meta + ')')
 		self.history_menu_item.connect('activate',open_link, 'https://www.pushbullet.com/')
 		self.history_menu.prepend(self.history_menu_item)
